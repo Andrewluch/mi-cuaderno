@@ -401,6 +401,18 @@ body[data-pat="mas"] header.top>div:not(.avatar){background:var(--surface);borde
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mtile.m-pink{background:#33191E}}
 :root[data-theme="dark"] .mtile.m-pink{background:#33191E}
 .news-upd{background:var(--surface);border-radius:999px;padding:3px 10px}
+
+/* Deporte: lista de entrenos del calendario */
+.ent{gap:12px}
+.entcheck{width:30px;height:30px;border-radius:50%;border:2.5px solid var(--c);background:transparent;color:#FFF8CA;font-weight:900;font-size:15px;display:grid;place-items:center;flex:none;padding:0}
+.entcheck[aria-pressed="true"]{background:var(--c)}
+.entbody{border:0;background:none;text-align:left;padding:0;flex:1;min-width:0}
+.ent.is-done .title{text-decoration:line-through;color:var(--muted)}
+.ent.is-missed .title{color:var(--muted)}
+.ent .act-ico{width:34px;height:34px;border-radius:10px}
+.ent .act-ico svg{width:18px;height:18px}
+.entdesc{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:14px;padding:14px;line-height:1.55}
+body[data-pat="deporte"] .view>section>.sec-head>h2,body[data-pat="deporte"] .view>section>.sec-head>span{background:var(--surface);border-radius:12px;padding:4px 12px;width:fit-content}
 </style>
 </head>
 <body>

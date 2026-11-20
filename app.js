@@ -49,7 +49,7 @@ const monday=d=>addDays(d,-((d.getDay()+6)%7));
 const KEY='mi-cuaderno:v1';
 function fresh(){return {v:1,start:key(today),books:[],quotes:[],resources:[],events:[],
   lists:[{id:uid(),t:'Cosas por hacer',items:[]},{id:uid(),t:'Lista de la compra',items:[]}],
-  sport:{plan:{},log:{},acts:[]},weights:[],weightGoal:null,
+  sport:{plan:{},log:{},acts:[],done:{}},weights:[],weightGoal:null,
   lang:{ingles:{days:[],h:'17:00',url:'https://preply.com/es/',homework:[],materials:[],vocab:[]},
         euskera:{days:[],h:'19:00',url:'',homework:[],materials:[],vocab:[]}}}}
 function load(){
@@ -60,7 +60,7 @@ function normalize(d){
   const f=fresh(); if(!d||typeof d!=='object'||d.v!==1)return f;
   for(const k in f)if(d[k]===undefined||d[k]===null&&k!=='weightGoal')d[k]=f[k];
   d.lang=d.lang||{}; for(const l of ['ingles','euskera'])d.lang[l]={...f.lang[l],...(d.lang[l]||{})};
-  d.sport={plan:{},log:{},acts:[],...d.sport};
+  d.sport={plan:{},log:{},acts:[],done:{},...d.sport};
   return d;
 }
 let warned=false;
@@ -68,24 +68,26 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(_){if(!wa
 let db=load();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
 
-const ui={news:null,newsSec:'Todas',tab:'hoy',libSeg:'libros',resTag:'Todos',langSeg:'ingles',flipped:new Set(),calOff:0,calSel:key(today),sportOff:0,addType:'tarea',addDate:null};
+const ui={entrenos:null,news:null,newsSec:'Todas',tab:'hoy',libSeg:'libros',resTag:'Todos',langSeg:'ingles',flipped:new Set(),calOff:0,calSel:key(today),sportOff:0,addType:'tarea',addDate:null};
 
 /* ---------- Deporte y agenda ---------- */
 const SPORT={run:{n:'Correr',c:'var(--s-run)'},gym:{n:'Fuerza',c:'var(--s-gym)'}};
-function workout(d){
-  const k=key(d),log=db.sport.log[k],p=db.sport.plan[d.getDay()];
-  if(log)return {k:log,t:(p&&p.k===log&&p.t)||SPORT[log].n,st:'done',h:p&&p.h||''};
-  if(!p||k<db.start)return null;
-  return {k:p.k,t:p.t||SPORT[p.k].n,st:d<today?'missed':'plan',h:p.h||''};
+const evs=()=>ui.entrenos&&ui.entrenos.items||[];
+const isDone=e=>db.sport.done[e.id]===true||(db.sport.done[e.id]!==false&&e.date<=key(today)&&db.sport.log[e.date]===e.k);
+function sportFor(d){
+  const k=key(d),E=evs().filter(e=>e.date===k);
+  if(E.length)return E.map(e=>({h:e.h,t:e.t,done:isDone(e)}));
+  const log=db.sport.log[k]; return log?[{h:'',t:(db.sport.acts.find(a=>a.date===k&&a.k===log)||{}).name||SPORT[log].n,done:true}]:[];
 }
-function weekStats(){let planned=0,done=0;const m=monday(today);
-  for(let i=0;i<7;i++){const d=addDays(m,i);if(db.sport.plan[d.getDay()])planned++;if(db.sport.log[key(d)])done++}
-  return {planned,done};}
+function weekStats(){const m=key(monday(today)),e=key(addDays(monday(today),6));
+  const E=evs().filter(x=>x.date>=m&&x.date<=e);
+  if(E.length)return {planned:E.length,done:E.filter(isDone).length};
+  let done=0;for(let i=0;i<7;i++)if(db.sport.log[key(addDays(monday(today),i))])done++;return {planned:done,done};}
 const CAT={plan:{n:'Planes',c:'var(--k-plan)'},deporte:{n:'Deporte',c:'var(--k-sport)'},idiomas:{n:'Idiomas',c:'var(--k-lang)'},tarea:{n:'Tareas',c:'var(--k-task)'}};
 const LANG={ingles:'Inglés · Preply',euskera:'Euskera · EOI'};
 function itemsFor(d){
   const k=key(d),out=db.events.filter(e=>e.date===k).map(e=>({h:e.h||'',t:e.t,cat:e.cat,id:e.id}));
-  const w=workout(d); if(w)out.push({h:w.h,t:w.t+(w.st==='done'?' ✓':''),cat:'deporte'});
+  for(const w of sportFor(d))out.push({h:w.h,t:w.t+(w.done?' ✓':''),cat:'deporte'});
   for(const l in LANG){const L=db.lang[l];if(L.days.includes(d.getDay()))out.push({h:L.h,t:LANG[l],cat:'idiomas'})}
   return out.sort((a,b)=>(a.h||'99').localeCompare(b.h||'99'));
 }
@@ -122,7 +124,7 @@ const views={
       <div class="list feature">${evs.length?evs.map(e=>evRow(e)).join(''):'<div class="empty">Nada para hoy. Añade un plan con el botón +.</div>'}</div>
     </section>
     <div class="today-grid">
-      <button class="tile run" data-act="go" data-to="deporte"><span class="small muted">Deporte esta semana</span><span class="big">${wk.done}<small> / ${wk.planned} sesiones</small></span><span class="small muted">${wk.planned?'Toca para ver el plan':'Configura tu plan semanal'}</span></button>
+      <button class="tile run" data-act="go" data-to="deporte"><span class="small muted">Deporte esta semana</span><span class="big">${wk.done}<small> / ${wk.planned} sesiones</small></span><span class="small muted">${wk.planned?'Toca para ver tus entrenos':'Sin entrenos esta semana'}</span></button>
       ${reading?`<button class="tile book" data-act="book" data-id="${reading.id}"><span class="small muted">Leyendo</span><h3>${esc(reading.t)}</h3><div class="bar"><span style="width:${bookPct(reading)}%"></span></div><span class="small muted num">${bookPct(reading)}%</span></button>`
                :`<button class="tile book" data-act="add" data-type="libro"><span class="small muted">Leyendo</span><h3>Añade el libro que estás leyendo</h3></button>`}
       <button class="tile ice" data-act="go" data-to="deporte"><span class="small muted">Peso</span>${w?`<span class="big">${kg(w.kg)}<small> kg</small></span><span class="small muted">${shortDate(w.date)}</span>`:'<h3>Apunta tu peso</h3>'}</button>
@@ -185,31 +187,23 @@ const views={
   },
 
   deporte(){
-    const base=new Date(today.getFullYear(),today.getMonth()+ui.sportOff,1);
-    const n=new Date(base.getFullYear(),base.getMonth()+1,0).getDate(), off=(base.getDay()+6)%7;
-    let cells='',mDone=0,mRun=0,mGym=0;
-    for(let i=0;i<off;i++)cells+='<span class="scell out"></span>';
-    for(let d=1;d<=n;d++){
-      const dt=new Date(base.getFullYear(),base.getMonth(),d),k=key(dt),w=workout(dt),isT=k===key(today);
-      if(w&&w.st==='done'){mDone++;w.k==='run'?mRun++:mGym++}
-      if(!w){cells+=`<button class="scell ${isT?'today':''}" data-act="sday" data-v="${k}" aria-label="${d}: sin entreno">${d}</button>`;continue}
-      cells+=`<button class="scell ${w.st} ${isT?'today':''}" data-act="sday" data-v="${k}" data-k="${w.k}" style="--c:${SPORT[w.k].c}" aria-label="${d}: ${esc(w.t)}${w.st==='done'?', hecho':''}">${svg(w.k,2.2)}${d}</button>`;
-    }
-    const wk=weekStats(),hasPlan=Object.keys(db.sport.plan).length>0;
+    const wk=weekStats(),base=new Date(today.getFullYear(),today.getMonth(),1);
+    const gymMonth=db.sport.acts.filter(a=>a.k==='gym'&&a.date.startsWith(key(base).slice(0,7))).length;
+    const m=key(monday(today)),sun=key(addDays(monday(today),6)),E=evs();
+    const week=E.filter(e=>e.date>=m&&e.date<=sun),next=E.filter(e=>e.date>sun).slice(0,12);
+    const list=(arr)=>`<div class="list">${arr.map(entRow).join('')}</div>`;
+    const cal=!ui.entrenos?info('Cargando tus entrenos…'):!E.length?info('Aún no llegan entrenos de tu calendario. Se actualizan cada mañana y cada vez que se publica la app.'):'';
     return `
-    <div class="card connect"><div><h3>Strava</h3><div class="small muted">${db.sport.stravaAt?`Importado el ${shortDate(db.sport.stravaAt)} · ${db.sport.acts.length} actividades. Toca un día para marcarlo o desmarcarlo.`:'Importa tus actividades con el archivo de Strava. Toca un día para marcarlo como hecho.'}</div></div><button class="btn ghost" data-act="importstrava">Importar</button></div>
-    <input type="file" id="strava-file" accept="application/json,.json" hidden>
-    <section class="card stripecal">
-      <div class="cal-head"><h2>${cap(MESES[base.getMonth()])}</h2><div class="cal-nav"><button data-act="sportnav" data-v="-1" aria-label="Mes anterior">${svg('left')}</button><button data-act="sportnav" data-v="1" aria-label="Mes siguiente">${svg('right')}</button></div></div>
-      <div class="month">${['L','M','X','J','V','S','D'].map(x=>`<span class="dow">${x}</span>`).join('')}${cells}</div>
-      <div class="legend">${Object.values(SPORT).map(s=>`<span><i style="background:${s.c}"></i>${s.n}</span>`).join('')}<span><i class="ring"></i>Programado</span></div>
-      <button class="btn ${hasPlan?'ghost':''}" data-act="plan">${hasPlan?'Cambiar plan semanal':'Crear mi plan semanal'}</button>
-    </section>
+    ${cal}
+    ${week.length?`<section><div class="sec-head"><h2>Esta semana</h2><span class="small muted num">${wk.done}/${wk.planned} hechos</span></div>${list(week)}</section>`:''}
+    ${next.length?`<section><h2>Próximos entrenos</h2>${list(next)}</section>`:''}
     <div class="stats">
-      <div class="stat"><div class="v">${wk.done}/${wk.planned}</div><div class="l">sesiones semana</div></div>
+      <div class="stat"><div class="v">${wk.done}/${wk.planned}</div><div class="l">entrenos semana</div></div>
       <div class="stat"><div class="v">${kmMonth(base)}</div><div class="l">km corridos (mes)</div></div>
-      <div class="stat"><div class="v">${mGym}</div><div class="l">días de fuerza (mes)</div></div>
+      <div class="stat"><div class="v">${gymMonth}</div><div class="l">días de fuerza (mes)</div></div>
     </div>
+    <div class="card connect"><div><h3>Strava</h3><div class="small muted">${db.sport.stravaAt?`Importado el ${shortDate(db.sport.stravaAt)} · ${db.sport.acts.length} actividades. Los entrenos del día que tengan actividad en Strava se marcan solos.`:'Importa tus actividades con el archivo de Strava.'}</div></div><button class="btn ghost" data-act="importstrava">Importar</button></div>
+    <input type="file" id="strava-file" accept="application/json,.json" hidden>
     ${actsSection()}
     ${weightSection()}
     <section class="steps"><span class="small muted">Pasos · app Salud</span><span>Llegarán solos en la fase 2, con un Atajo del iPhone.</span></section>`;
@@ -308,6 +302,27 @@ function loadNews(){
   fetch('news.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw 0;return r.json()})
     .then(d=>{ui.news=d&&Array.isArray(d.items)?d:{items:[]}}).catch(()=>{ui.news={items:[]}})
     .finally(()=>{if(['hoy','noticias'].includes(ui.tab))render()});
+}
+function entRow(e){
+  const d=fromKey(e.date),done=isDone(e),past=e.date<key(today);
+  const when=e.date===key(today)?'Hoy':e.date===key(addDays(today,1))?'Mañana':`${cap(DIAS[d.getDay()])} ${d.getDate()}`;
+  return `<div class="row ent ${done?'is-done':''} ${past&&!done?'is-missed':''}">
+    <button class="entcheck" data-act="evdone" data-id="${esc(e.id)}" aria-pressed="${done}" aria-label="${done?'Desmarcar':'Marcar como hecho'}" style="--c:${SPORT[e.k].c}">${done?'✓':''}</button>
+    <button class="body entbody" data-act="evinfo" data-id="${esc(e.id)}"><div class="title">${esc(e.t)}</div><div class="act-meta"><span>${when}${e.h?' · '+e.h:''}</span>${e.desc?'<span>Ver detalles ›</span>':''}</div></button>
+    <span class="act-ico" data-k="${e.k}" style="--c:${SPORT[e.k].c}">${svg(e.k)}</span></div>`;
+}
+function entSheet(id){
+  const e=evs().find(x=>x.id===id); if(!e)return;
+  const d=fromKey(e.date),done=isDone(e);
+  openSheet(`<div style="display:flex;gap:12px;align-items:center"><span class="act-ico" data-k="${e.k}" style="--c:${SPORT[e.k].c}">${svg(e.k)}</span><div style="min-width:0"><h2>${esc(e.t)}</h2><div class="muted">${cap(DIAS_L[d.getDay()])} ${d.getDate()} de ${MESES[d.getMonth()]}${e.h?' · '+e.h:''}</div></div></div>
+    ${e.desc?`<div class="entdesc">${esc(e.desc)}</div>`:'<span class="small muted">Este entreno no tiene descripción en el calendario.</span>'}
+    ${e.loc?`<span class="small muted">📍 ${esc(e.loc)}</span>`:''}
+    <button class="btn full ${done?'ghost':''}" data-act="evdone" data-id="${esc(e.id)}" data-close="1">${done?'Desmarcar':'Marcar como hecho'}</button>`,e.t);
+}
+function loadEntrenos(){
+  fetch('entrenos.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw 0;return r.json()})
+    .then(d=>{ui.entrenos=d&&Array.isArray(d.items)?d:{items:[]}}).catch(()=>{ui.entrenos={items:[]}})
+    .finally(()=>render());
 }
 function weightSection(){
   const W=db.weights.slice(-12),g=db.weightGoal;
@@ -469,6 +484,8 @@ const A={
   libseg:(el,d)=>{ui.libSeg=d.v;render()}, tag:(el,d)=>{ui.resTag=d.v;render()},
   lang:(el,d)=>{ui.langSeg=d.v;render()},
   newssec:(el,d)=>{ui.newsSec=d.v;render()},
+  evdone:(el,d)=>{const e=evs().find(x=>x.id===d.id);if(!e)return;const now=!isDone(e);db.sport.done[e.id]=now;if(d.close)closeSheet();commit(now?'¡Entreno hecho!':'Desmarcado')},
+  evinfo:(el,d)=>entSheet(d.id),
   flip:(el,d)=>{ui.flipped.has(d.id)?ui.flipped.delete(d.id):ui.flipped.add(d.id);render()},
   book:(el,d)=>bookSheet(d.id),
   cal:(el,d)=>{ui.calSel=d.v;render()},
@@ -540,4 +557,5 @@ window.addEventListener('storage',e=>{if(e.key===KEY){db=load();render()}});
 
 render();
 loadNews();
+loadEntrenos();
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
