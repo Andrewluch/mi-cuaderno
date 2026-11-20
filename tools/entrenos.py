@@ -7,6 +7,8 @@ import icalendar, recurring_ical_events
 TZ = ZoneInfo('Europe/Madrid')
 out_path = sys.argv[1] if len(sys.argv) > 1 else 'entrenos.json'
 url = os.environ.get('ICS_URL', '').strip()
+if url.lower().startswith('webcal://'):
+    url = 'https://' + url[9:]
 items = []
 if url:
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; MiCuaderno/1.0)'})
