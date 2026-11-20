@@ -49,7 +49,7 @@ const monday=d=>addDays(d,-((d.getDay()+6)%7));
 const KEY='mi-cuaderno:v1';
 function fresh(){return {v:1,start:key(today),books:[],quotes:[],resources:[],events:[],
   lists:[{id:uid(),t:'Cosas por hacer',items:[]},{id:uid(),t:'Lista de la compra',items:[]}],
-  sport:{plan:{},log:{}},weights:[],weightGoal:null,
+  sport:{plan:{},log:{},acts:[]},weights:[],weightGoal:null,
   lang:{ingles:{days:[],h:'17:00',url:'https://preply.com/es/',homework:[],materials:[],vocab:[]},
         euskera:{days:[],h:'19:00',url:'',homework:[],materials:[],vocab:[]}}}}
 function load(){
@@ -60,7 +60,7 @@ function normalize(d){
   const f=fresh(); if(!d||typeof d!=='object'||d.v!==1)return f;
   for(const k in f)if(d[k]===undefined||d[k]===null&&k!=='weightGoal')d[k]=f[k];
   d.lang=d.lang||{}; for(const l of ['ingles','euskera'])d.lang[l]={...f.lang[l],...(d.lang[l]||{})};
-  d.sport={plan:{},log:{},...d.sport};
+  d.sport={plan:{},log:{},acts:[],...d.sport};
   return d;
 }
 let warned=false;
@@ -68,7 +68,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(_){if(!wa
 let db=load();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
 
-const ui={tab:'hoy',libSeg:'libros',resTag:'Todos',langSeg:'ingles',flipped:new Set(),calOff:0,calSel:key(today),sportOff:0,addType:'tarea',addDate:null};
+const ui={news:null,newsSec:'Todas',tab:'hoy',libSeg:'libros',resTag:'Todos',langSeg:'ingles',flipped:new Set(),calOff:0,calSel:key(today),sportOff:0,addType:'tarea',addDate:null};
 
 /* ---------- Deporte y agenda ---------- */
 const SPORT={run:{n:'Correr',c:'var(--s-run)'},gym:{n:'Fuerza',c:'var(--s-gym)'}};
@@ -128,6 +128,7 @@ const views={
       <button class="tile ice" data-act="go" data-to="deporte"><span class="small muted">Peso</span>${w?`<span class="big">${kg(w.kg)}<small> kg</small></span><span class="small muted">${shortDate(w.date)}</span>`:'<h3>Apunta tu peso</h3>'}</button>
       <button class="tile choc" data-act="go" data-to="notas"><span class="small muted">Por hacer</span><span class="big">${pending()}</span><span class="small">tareas pendientes</span></button>
     </div>
+    ${newsHoy()}
     <section>
       <h2>Apuntar algo</h2>
       <form class="quick" data-form="quick"><input id="quick-in" placeholder="Añadir a «${esc(db.lists[0]?db.lists[0].t:'Cosas por hacer')}»…" aria-label="Nueva tarea" autocomplete="off"><button class="btn" type="submit">Añadir</button></form>
@@ -196,7 +197,8 @@ const views={
     }
     const wk=weekStats(),hasPlan=Object.keys(db.sport.plan).length>0;
     return `
-    <div class="card connect"><div><h3>Strava</h3><div class="small muted">Llegará en la fase 2. Mientras, toca un día para marcarlo como hecho.</div></div><span class="chip">Pronto</span></div>
+    <div class="card connect"><div><h3>Strava</h3><div class="small muted">${db.sport.stravaAt?`Importado el ${shortDate(db.sport.stravaAt)} · ${db.sport.acts.length} actividades. Toca un día para marcarlo o desmarcarlo.`:'Importa tus actividades con el archivo de Strava. Toca un día para marcarlo como hecho.'}</div></div><button class="btn ghost" data-act="importstrava">Importar</button></div>
+    <input type="file" id="strava-file" accept="application/json,.json" hidden>
     <section class="card stripecal">
       <div class="cal-head"><h2>${cap(MESES[base.getMonth()])}</h2><div class="cal-nav"><button data-act="sportnav" data-v="-1" aria-label="Mes anterior">${svg('left')}</button><button data-act="sportnav" data-v="1" aria-label="Mes siguiente">${svg('right')}</button></div></div>
       <div class="month">${['L','M','X','J','V','S','D'].map(x=>`<span class="dow">${x}</span>`).join('')}${cells}</div>
@@ -205,9 +207,10 @@ const views={
     </section>
     <div class="stats">
       <div class="stat"><div class="v">${wk.done}/${wk.planned}</div><div class="l">sesiones semana</div></div>
-      <div class="stat"><div class="v">${mRun}</div><div class="l">días corriendo (mes)</div></div>
+      <div class="stat"><div class="v">${kmMonth(base)}</div><div class="l">km corridos (mes)</div></div>
       <div class="stat"><div class="v">${mGym}</div><div class="l">días de fuerza (mes)</div></div>
     </div>
+    ${actsSection()}
     ${weightSection()}
     <section class="steps"><span class="small muted">Pasos · app Salud</span><span>Llegarán solos en la fase 2, con un Atajo del iPhone.</span></section>`;
   },
@@ -239,17 +242,27 @@ const views={
   },
 
   mas(){
+    const n=ui.news&&ui.news.items?ui.news.items.length:0,D=db.lang;
+    const nx=nextClass(D.ingles)||nextClass(D.euskera);
     return `<div class="mgrid">
-      <button class="mtile b" data-act="go" data-to="idiomas"><span class="mico">${svg('idiomas')}</span><span class="mlabel">Idiomas<small>Inglés · Euskera</small></span></button>
-      <button class="mtile r" data-act="go" data-to="noticias"><span class="mico">${svg('news')}</span><span class="mlabel">Noticias<small>Tus periódicos</small></span></button>
-      <button class="mtile g" data-act="go" data-to="gastos"><span class="mico">${svg('lock')}</span><span class="mlabel">Gastos<small>Próximamente</small></span></button>
-      <button class="mtile plain" data-act="go" data-to="copia"><span class="mico">${svg('backup')}</span><span class="mlabel">Copia de seguridad<small>Guarda tus datos</small></span></button>
-    </div>`;
+      <button class="mtile m-ice" data-act="go" data-to="idiomas"><span class="mico">${svg('idiomas')}</span><span class="mlabel">Idiomas<small>${nx?'Próxima clase: '+esc(nx):'Inglés · Euskera'}</small></span></button>
+      <button class="mtile m-butter" data-act="go" data-to="noticias"><span class="mico">${svg('news')}</span><span class="mlabel">Noticias<small>${n?n+' titulares hoy':'Tus periódicos'}</small></span></button>
+      <button class="mtile m-choc" data-act="go" data-to="gastos"><span class="mico">${svg('lock')}</span><span class="mlabel">Gastos<small>Próximamente</small></span></button>
+      <button class="mtile m-pink" data-act="go" data-to="copia"><span class="mico">${svg('backup')}</span><span class="mlabel">Copia de seguridad<small>Guarda tus datos</small></span></button>
+    </div>
+    <div class="mtip">${svg('info')}<span>Aquí irán apareciendo los apartados nuevos que vayamos añadiendo.</span></div>`;
   },
 
   noticias(){
-    return info('En la fase 2 aquí saldrán cada mañana los titulares más importantes. Mientras, tienes tus periódicos a un toque.')+
-      NEWS.map(([g,ls])=>`<section><h2>${g}</h2><div class="list news">${ls.map(([n,u])=>`<a class="row" href="${u}" target="_blank" rel="noopener"><div class="fav">${n[0]}</div><div class="body"><div class="title">${n}</div><div class="src">${host(u)}</div></div></a>`).join('')}</div></section>`).join('');
+    const N=ui.news,items=N&&N.items||[];
+    const secs=['Todas',...new Set(items.map(n=>n.s))];
+    const ns=items.filter(n=>ui.newsSec==='Todas'||n.s===ui.newsSec);
+    const head=!N?info('Cargando los titulares de hoy…'):!items.length?info('Los titulares se actualizan cada mañana. Si aún no aparecen, vuelve a abrir la app más tarde.'):'';
+    return `${head}
+    ${items.length?`<div class="sec-head"><span class="small muted news-upd">Actualizado ${newsTime(N.updated)}</span></div>
+    <div class="chips">${secs.map(x=>`<button class="chip ${x===ui.newsSec?'on':''}" data-act="newssec" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div class="list news">${ns.map(n=>newsRow(n)).join('')}</div>`:''}
+    <section><h2>Tus periódicos</h2>${NEWS.map(([g,ls])=>`<div class="chips">${ls.map(([n,u])=>`<a class="chip" href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`).join('')}</section>`;
   },
 
   gastos(){
@@ -269,6 +282,33 @@ const views={
   }
 };
 
+const kmMonth=base=>{const p=key(base).slice(0,7);const v=db.sport.acts.filter(a=>a.k==='run'&&a.date.startsWith(p)).reduce((n,a)=>n+(parseFloat(String(a.km).replace(',','.'))||0),0);return v?v.toFixed(1).replace('.',','):'0'};
+const ACT_ICON={run:'run',gym:'gym'};
+function actsSection(){
+  const A=db.sport.acts.slice(0,8); if(!A.length)return '';
+  return `<section><h2>Últimas actividades</h2><div class="list">${A.map(a=>{const sp=SPORT[a.k];return `<div class="row"><div class="act-ico" data-k="${a.k}" style="--c:${sp?sp.c:'var(--muted)'}">${svg(ACT_ICON[a.k]||'deporte')}</div><div class="body"><div class="title">${esc(a.name)}</div><div class="act-meta">${[a.km&&a.km!=='0,0'?a.km+' km':'',a.time,a.pace].filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('')}</div></div><span class="small muted">${shortDate(a.date)}</span></div>`}).join('')}</div></section>`;
+}
+function mergeStrava(d){
+  const have=new Set(db.sport.acts.map(a=>a.id));let n=0;
+  for(const a of d.activities||[]){if(!a||!a.id||!a.date||have.has(a.id))continue;db.sport.acts.push(a);have.add(a.id);n++;
+    if((a.k==='run'||a.k==='gym')&&!db.sport.log[a.date])db.sport.log[a.date]=a.k}
+  db.sport.acts.sort((x,y)=>y.date.localeCompare(x.date)||String(y.start||'').localeCompare(String(x.start||'')));
+  db.sport.stravaAt=key(today); ui.tab='deporte'; commit(n?`${n} actividades importadas`:'Ya estaban todas importadas');
+}
+const newsTime=u=>{try{const d=new Date(u);return `${d.getDate()} ${MESES[d.getMonth()].slice(0,3)}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}catch(_){return ''}};
+const newsRow=(n,i)=>`<a class="row" href="${href(n.u)}" target="_blank" rel="noopener">${i!=null?`<span class="news-num">${i+1}</span>`:''}<div class="body"><div class="sec">${esc(n.s)}</div><div class="title">${esc(n.t)}</div><div class="src">${esc(n.src)}</div></div></a>`;
+function newsHoy(){
+  const items=ui.news&&ui.news.items||[];
+  const head=`<div class="sec-head"><h2>Noticias de hoy</h2><button class="link" data-act="go" data-to="noticias">Ver todas</button></div>`;
+  if(!ui.news)return `<section>${head}<div class="list news"><div class="empty">Cargando titulares…</div></div></section>`;
+  if(!items.length)return `<section>${head}<div class="list news"><button class="row" data-act="go" data-to="noticias"><div class="body"><div class="title">Abre tus periódicos</div><div class="src">Los titulares llegan cada mañana</div></div></button></div></section>`;
+  return `<section>${head}<div class="list news">${items.slice(0,5).map((n,i)=>newsRow(n,i)).join('')}</div></section>`;
+}
+function loadNews(){
+  fetch('news.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw 0;return r.json()})
+    .then(d=>{ui.news=d&&Array.isArray(d.items)?d:{items:[]}}).catch(()=>{ui.news={items:[]}})
+    .finally(()=>{if(['hoy','noticias'].includes(ui.tab))render()});
+}
 function weightSection(){
   const W=db.weights.slice(-12),g=db.weightGoal;
   const head=`<div class="sec-head"><h2>Peso</h2><button class="link" data-act="add" data-type="peso">+ Apuntar</button></div>`;
@@ -300,7 +340,7 @@ function greeting(){const h=new Date().getHours();return h<6?'Buenas noches':h<1
 function render(){
   document.getElementById('main').innerHTML=`<div class="view">${views[ui.tab]()}</div>`;
   document.getElementById('page-title').textContent=ui.tab==='hoy'?greeting():TITLES[ui.tab];
-  const pat=['hoy','calendario','libros','deporte','notas'].includes(ui.tab);
+  const pat=['hoy','calendario','libros','deporte','notas','mas'].includes(ui.tab);
   document.body.dataset.tab=ui.tab; document.body.classList.toggle('pat',pat); document.body.dataset.pat=pat?ui.tab:'';
   const cur=SUB.includes(ui.tab)?'mas':ui.tab;
   document.getElementById('tabs').innerHTML=Object.keys(TAB).map(k=>`<button data-act="tab" data-to="${k}" ${k===cur?'aria-current="page"':''}>${svg(k,1.8)}${TAB[k]}</button>`).join('');
@@ -416,7 +456,10 @@ async function exportData(){
 }
 function importData(file){
   const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||d.v!==1)throw 0;db=normalize(d);commit('Copia recuperada')}catch(_){toast('Ese archivo no es una copia de Mi Cuaderno')}};
+  r.onload=()=>{let d;try{d=JSON.parse(r.result)}catch(_){return toast('No se ha podido leer el archivo')}
+    if(d&&d.type==='mi-cuaderno-strava')return mergeStrava(d);
+    if(!d||d.v!==1)return toast('Ese archivo no es una copia de Mi Cuaderno');
+    db=normalize(d);commit('Copia recuperada')};
   r.readAsText(file);
 }
 
@@ -425,6 +468,7 @@ const A={
   tab:(el,d)=>go(d.to), go:(el,d)=>go(d.to),
   libseg:(el,d)=>{ui.libSeg=d.v;render()}, tag:(el,d)=>{ui.resTag=d.v;render()},
   lang:(el,d)=>{ui.langSeg=d.v;render()},
+  newssec:(el,d)=>{ui.newsSec=d.v;render()},
   flip:(el,d)=>{ui.flipped.has(d.id)?ui.flipped.delete(d.id):ui.flipped.add(d.id);render()},
   book:(el,d)=>bookSheet(d.id),
   cal:(el,d)=>{ui.calSel=d.v;render()},
@@ -456,6 +500,7 @@ const A={
   savelang:()=>{const D=db.lang[ui.langSeg];D.days=[...sheet.querySelectorAll('#daypick [aria-pressed="true"]')].map(b=>+b.dataset.v);D.h=val('l-h');D.url=val('l-u');closeSheet();commit('Guardado')},
   export:()=>exportData(),
   import:()=>document.getElementById('import-file').click(),
+  importstrava:()=>document.getElementById('strava-file').click(),
   wipe:()=>{db=fresh();commit('Datos borrados')}
 };
 document.addEventListener('click',e=>{
@@ -471,7 +516,7 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.check){const [lid,iid]=t.dataset.check.split(':');const it=db.lists.find(l=>l.id===lid)?.items.find(i=>i.id===iid);if(it){it.d=t.checked;commit()}}
   else if(t.dataset.hw){const h=db.lang[ui.langSeg].homework.find(x=>x.id===t.dataset.hw);if(h){h.d=t.checked;commit()}}
-  else if(t.id==='import-file'&&t.files[0])importData(t.files[0]);
+  else if((t.id==='import-file'||t.id==='strava-file')&&t.files[0]){importData(t.files[0]);t.value=''}
 });
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]'); if(!f)return; e.preventDefault();
@@ -494,4 +539,5 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState!==
 window.addEventListener('storage',e=>{if(e.key===KEY){db=load();render()}});
 
 render();
+loadNews();
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});

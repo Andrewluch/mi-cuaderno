@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * *'   # cada mañana (6:17 en invierno, 7:17 en verano): titulares nuevos
 permissions:
   contents: read
   pages: write
@@ -25,6 +27,8 @@ jobs:
         run: pip install pillow && python tools/make_icons.py
       - name: Preparar la web
         run: mkdir _site && cp -r index.html app.js sw.js manifest.webmanifest icons _site/
+      - name: Titulares del día
+        run: python tools/news.py _site/news.json || echo '{"items":[]}' > _site/news.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

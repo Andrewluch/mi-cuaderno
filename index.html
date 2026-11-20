@@ -383,6 +383,24 @@ img{max-width:100%}
 .stripecal .btn{align-self:flex-start}
 .stripecal{display:flex;flex-direction:column;gap:10px}
 .view>.btn.full{margin-top:-8px}
+
+/* Más: rayas rosa y crema con estrellitas doradas, tarjetas lisas como en Hoy */
+body[data-pat="mas"]::after{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88'%3E%3Crect width='88' height='88' fill='%23FFF8EC'/%3E%3Crect x='0' width='22' height='88' fill='%23F6D3DB'/%3E%3Crect x='44' width='22' height='88' fill='%23F6D3DB'/%3E%3Cpolygon points='33.0,15.0 34.3,20.7 40.0,22.0 34.3,23.3 33.0,29.0 31.7,23.3 26.0,22.0 31.7,20.7' fill='%23D9A93A'/%3E%3Cpolygon points='77.0,59.0 78.3,64.7 84.0,66.0 78.3,67.3 77.0,73.0 75.7,67.3 70.0,66.0 75.7,64.7' fill='%23D9A93A'/%3E%3Ccircle cx='11' cy='60' r='1.6' fill='%236B0B0C' opacity='.5'/%3E%3Ccircle cx='55' cy='14' r='1.6' fill='%236B0B0C' opacity='.5'/%3E%3C/svg%3E")}
+body[data-pat="mas"] header.top>div:not(.avatar){background:var(--surface);border-radius:16px;padding:8px 14px 10px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) body[data-pat="mas"]::after{opacity:.14}}
+:root[data-theme="dark"] body[data-pat="mas"]::after{opacity:.14}
+.mtile.m-ice,.mtile.m-butter,.mtile.m-choc,.mtile.m-pink{background-image:none;border-color:transparent;box-shadow:0 2px 8px rgba(45,18,13,.08);min-height:150px;padding:16px}
+.mtile.m-ice{background:var(--lang-soft)} .mtile.m-ice .mico{color:var(--lang)}
+.mtile.m-butter{background:var(--accent-soft)}
+.mtile.m-choc{background:var(--choc);color:var(--butter)} .mtile.m-choc .mlabel{color:var(--butter)} .mtile.m-choc .mico{background:rgba(255,248,202,.14);color:var(--butter)} .mtile.m-choc .mlabel small{color:var(--butter);opacity:.75}
+.mtile.m-pink{background:#F8DDE3}
+.mtile .mlabel{background:none;padding:0;font-size:17px;gap:3px}
+.mtile .mico{width:44px;height:44px;border-radius:14px}
+.mtip{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);background:var(--surface);border-radius:14px;padding:10px 12px}
+.mtip svg{width:18px;height:18px;flex:none;color:var(--accent);margin-top:1px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mtile.m-pink{background:#33191E}}
+:root[data-theme="dark"] .mtile.m-pink{background:#33191E}
+.news-upd{background:var(--surface);border-radius:999px;padding:3px 10px}
 </style>
 </head>
 <body>
