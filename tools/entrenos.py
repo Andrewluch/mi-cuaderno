@@ -37,3 +37,5 @@ if url:
 with open(out_path, 'w', encoding='utf-8') as f:
     json.dump({'updated': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='minutes'), 'items': items}, f, ensure_ascii=False)
 print(f'{len(items)} entrenos' if url else 'Sin enlace de calendario (secreto ENTRENOS_ICS vacío)')
+if items:
+    print(f"correr: {sum(x['k']=='run' for x in items)} · fuerza: {sum(x['k']=='gym' for x in items)} · con descripción: {sum(bool(x['desc']) for x in items)} · con hora: {sum(bool(x['h']) for x in items)}")
