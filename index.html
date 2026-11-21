@@ -413,6 +413,20 @@ body[data-pat="mas"] header.top>div:not(.avatar){background:var(--surface);borde
 .ent .act-ico svg{width:18px;height:18px}
 .entdesc{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:14px;padding:14px;line-height:1.55}
 body[data-pat="deporte"] .view>section>.sec-head>h2,body[data-pat="deporte"] .view>section>.sec-head>span{background:var(--surface);border-radius:12px;padding:4px 12px;width:fit-content}
+
+/* Composición corporal */
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.btile{background:var(--bg);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.btile .l{font-size:12px;color:var(--muted);font-weight:700}
+.btile .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.btile .v small{font-size:13px;color:var(--muted);font-weight:700;margin-left:1px}
+.btile .bd{font-size:12px;font-weight:700;color:var(--muted);min-height:16px}
+.btile .bd.up-good{color:var(--run)}
+.btile .bd.up-bad{color:var(--warm)}
+.bspark{display:flex;flex-direction:column;gap:4px}
+.bspark svg{width:100%;height:auto;display:block;overflow:visible}
+.bspark .wl{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.bspark .wd{fill:var(--accent)}
 </style>
 </head>
 <body>

@@ -127,7 +127,7 @@ const views={
       <button class="tile run" data-act="go" data-to="deporte"><span class="small muted">Deporte esta semana</span><span class="big">${wk.done}<small> / ${wk.planned} sesiones</small></span><span class="small muted">${wk.planned?'Toca para ver tus entrenos':'Sin entrenos esta semana'}</span></button>
       ${reading?`<button class="tile book" data-act="book" data-id="${reading.id}"><span class="small muted">Leyendo</span><h3>${esc(reading.t)}</h3><div class="bar"><span style="width:${bookPct(reading)}%"></span></div><span class="small muted num">${bookPct(reading)}%</span></button>`
                :`<button class="tile book" data-act="add" data-type="libro"><span class="small muted">Leyendo</span><h3>Añade el libro que estás leyendo</h3></button>`}
-      <button class="tile ice" data-act="go" data-to="deporte"><span class="small muted">Peso</span>${w?`<span class="big">${kg(w.kg)}<small> kg</small></span><span class="small muted">${shortDate(w.date)}</span>`:'<h3>Apunta tu peso</h3>'}</button>
+      <button class="tile ice" data-act="go" data-to="deporte"><span class="small muted">Peso</span>${w?`<span class="big">${kg(w.kg)}<small> kg</small></span><span class="small muted">${w.fat!=null?`${dec(w.fat)}% grasa · `:''}${shortDate(w.date)}</span>`:'<h3>Apunta tu peso</h3>'}</button>
       <button class="tile choc" data-act="go" data-to="notas"><span class="small muted">Por hacer</span><span class="big">${pending()}</span><span class="small">tareas pendientes</span></button>
     </div>
     ${newsHoy()}
@@ -190,13 +190,13 @@ const views={
     const wk=weekStats(),base=new Date(today.getFullYear(),today.getMonth(),1);
     const gymMonth=db.sport.acts.filter(a=>a.k==='gym'&&a.date.startsWith(key(base).slice(0,7))).length;
     const m=key(monday(today)),sun=key(addDays(monday(today),6)),E=evs();
-    const week=E.filter(e=>e.date>=m&&e.date<=sun),next=E.filter(e=>e.date>sun).slice(0,12);
+    const week=E.filter(e=>e.date>=m&&e.date<=sun),next=E.filter(e=>e.date>sun&&e.date<=key(addDays(monday(today),13)));
     const list=(arr)=>`<div class="list">${arr.map(entRow).join('')}</div>`;
     const cal=!ui.entrenos?info('Cargando tus entrenos…'):!E.length?info('Aún no llegan entrenos de tu calendario. Se actualizan cada mañana y cada vez que se publica la app.'):'';
     return `
     ${cal}
     ${week.length?`<section><div class="sec-head"><h2>Esta semana</h2><span class="small muted num">${wk.done}/${wk.planned} hechos</span></div>${list(week)}</section>`:''}
-    ${next.length?`<section><h2>Próximos entrenos</h2>${list(next)}</section>`:''}
+    ${next.length?`<section><h2>La semana que viene</h2>${list(next)}</section>`:''}
     <div class="stats">
       <div class="stat"><div class="v">${wk.done}/${wk.planned}</div><div class="l">entrenos semana</div></div>
       <div class="stat"><div class="v">${kmMonth(base)}</div><div class="l">km corridos (mes)</div></div>
@@ -324,10 +324,32 @@ function loadEntrenos(){
     .then(d=>{ui.entrenos=d&&Array.isArray(d.items)?d:{items:[]}}).catch(()=>{ui.entrenos={items:[]}})
     .finally(()=>render());
 }
+const num=v=>parseFloat(String(v||'').replace(',','.'));
+const dec=v=>(Math.round(v*10)/10).toLocaleString('es-ES',{maximumFractionDigits:1});
+function bodySection(){
+  const W=db.weights; if(!W.length)return '';
+  const last=f=>{for(let i=W.length-1;i>=0;i--)if(W[i][f]!=null)return {v:W[i][f],i};return null};
+  const prev=(f,i)=>{for(let j=i-1;j>=0;j--)if(W[j][f]!=null)return W[j][f];return null};
+  const tiles=[];
+  const add=(f,label,unit,good)=>{const L=last(f);if(!L)return;const p=prev(f,L.i),d=p!=null?L.v-p:null;
+    const cls=d==null||Math.abs(d)<.05?'':((d<0)===(good==='down')?'up-good':'up-bad');
+    tiles.push(`<div class="btile"><span class="l">${label}</span><span class="v">${dec(L.v)}<small>${unit}</small></span>${d!=null&&Math.abs(d)>=.05?`<span class="bd ${cls}">${d>0?'+':'−'}${dec(Math.abs(d))}${unit}</span>`:'<span class="bd"> </span>'}</div>`)};
+  add('fat','Grasa corporal','%','down');
+  const kgL=W.at(-1).kg; if(db.height){const imc=kgL/Math.pow(db.height/100,2);tiles.push(`<div class="btile"><span class="l">IMC</span><span class="v">${dec(imc)}</span><span class="bd">${imc<18.5?'Bajo':imc<25?'Saludable':imc<30?'Sobrepeso':'Alto'}</span></div>`)}
+  add('muscle','Masa muscular',' kg','up');
+  add('water','Agua','%','up');
+  add('visceral','Grasa visceral','','down');
+  if(!tiles.length)return `<section class="card"><div class="sec-head"><h2>Composición corporal</h2><button class="link" data-act="add" data-type="peso">+ Añadir</button></div><span class="small muted">Cuando te peses, añade el % de grasa y los demás datos de tu báscula.</span></section>`;
+  const F=W.filter(w=>w.fat!=null).slice(-12);let spark='';
+  if(F.length>=2){const mx=Math.max(...F.map(w=>w.fat))+.3,mn=Math.min(...F.map(w=>w.fat))-.3,X=i=>6+i*(288/(F.length-1)),Y=v=>6+(mx-v)/(mx-mn)*40;
+    const pts=F.map((w,i)=>`${X(i).toFixed(1)},${Y(w.fat).toFixed(1)}`).join(' ');
+    spark=`<div class="bspark"><span class="small muted">% grasa desde el ${shortDate(F[0].date)}</span><svg viewBox="0 0 300 52" role="img" aria-label="Evolución del porcentaje de grasa: de ${dec(F[0].fat)} a ${dec(F.at(-1).fat)}%"><polyline class="wl" points="${pts}"/><circle class="wd" cx="${X(F.length-1)}" cy="${Y(F.at(-1).fat)}" r="4"/></svg></div>`}
+  return `<section class="card"><div class="sec-head"><h2>Composición corporal</h2><span class="small muted">${shortDate(W.at(-1).date)}</span></div><div class="bgrid">${tiles.join('')}</div>${spark}${db.height?'':'<span class="small muted">Pon tu altura al apuntar el peso y te calculo el IMC.</span>'}</section>`;
+}
 function weightSection(){
   const W=db.weights.slice(-12),g=db.weightGoal;
   const head=`<div class="sec-head"><h2>Peso</h2><button class="link" data-act="add" data-type="peso">+ Apuntar</button></div>`;
-  if(!W.length)return `<section class="card">${head}<span class="small muted">Aún no hay registros. Apunta tu peso cuando te peses.</span></section>`;
+  if(!W.length)return `<section class="card">${head}<span class="small muted">Aún no hay registros. Apunta tu peso y los datos de tu báscula cuando te peses.</span></section>`;
   const cur=W.at(-1).kg,first=W[0].kg,d=cur-first;
   let chart='';
   if(W.length>=2){
@@ -344,7 +366,7 @@ function weightSection(){
   return `<section class="card">${head}
     <div class="wbig"><span class="v">${kg(cur)} <small class="small muted">kg</small></span>${W.length>=2?`<span class="delta">${d<=0?'−':'+'}${kg(Math.abs(d))} kg desde el ${shortDate(W[0].date)}</span>`:''}</div>
     ${chart}${g?`<span class="small muted">${cur>g?`Te faltan ${kg(cur-g)} kg para tu objetivo.`:'¡Objetivo conseguido!'}</span>`:''}
-  </section>`;
+  </section>${bodySection()}`;
 }
 
 const TITLES={hoy:'Buenos días',libros:'Biblioteca',calendario:'Agenda',deporte:'Deporte',idiomas:'Idiomas',notas:'Notas',mas:'Más',noticias:'Noticias',gastos:'Gastos',copia:'Copia de seguridad'};
@@ -415,7 +437,7 @@ function saveBook(){
 
 const TYPES={
   tarea:{n:'Tarea'},evento:{n:'Plan'},libro:{n:'Libro'},frase:{n:'Frase'},
-  recurso:{n:'Recurso'},lista:{n:'Lista'},peso:{n:'Peso'}
+  recurso:{n:'Recurso'},lista:{n:'Lista'},peso:{n:'Salud'}
 };
 function addSheet(type,opts={}){
   ui.addType=type||ui.addType; const t=ui.addType;
@@ -428,7 +450,12 @@ function addSheet(type,opts={}){
   if(t==='frase')body=`<div class="field"><label for="f-a">La frase que te ha gustado</label><textarea id="f-a" required></textarea></div>`+f('f-b','¿De qué libro?','list="dl-books"')+f('f-c','Página (opcional)','inputmode="numeric"')+`<datalist id="dl-books">${db.books.map(b=>`<option value="${esc(b.t)}">`).join('')}</datalist>`;
   if(t==='recurso')body=f('f-a','Título o enlace','required')+f('f-u','Enlace (opcional)','type="url" inputmode="url"')+f('f-b','Etiqueta (p. ej. Deporte)','list="dl-tags"')+`<datalist id="dl-tags">${[...new Set(db.resources.map(r=>r.tag).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
   if(t==='lista')body=f('f-a','Nombre de la lista','required');
-  if(t==='peso')body=`<div class="pair" style="grid-template-columns:1fr 1fr"><div class="field"><label for="f-a">Peso (kg)</label><input id="f-a" type="text" inputmode="decimal" placeholder="63,5" required autocomplete="off"></div><div class="field"><label for="f-date">Día</label><input id="f-date" type="date" value="${key(today)}" required></div></div>`+f('f-goal','Objetivo (opcional)',`type="text" inputmode="decimal" value="${db.weightGoal!=null?kg(db.weightGoal):''}"`);
+  if(t==='peso'){const L=db.weights.at(-1)||{},n2=(id,l,ph)=>`<div class="field"><label for="${id}">${l}</label><input id="${id}" type="text" inputmode="decimal" placeholder="${ph}" autocomplete="off"></div>`;
+    body=`<div class="pair" style="grid-template-columns:1fr 1fr"><div class="field"><label for="f-a">Peso (kg)</label><input id="f-a" type="text" inputmode="decimal" placeholder="${L.kg?kg(L.kg):'63,5'}" required autocomplete="off"></div><div class="field"><label for="f-date">Día</label><input id="f-date" type="date" value="${key(today)}" required></div></div>
+    <span class="flabel">Datos de la báscula (opcional)</span>
+    <div class="pair" style="grid-template-columns:1fr 1fr">${n2('f-fat','% grasa',L.fat!=null?dec(L.fat):'24,5')}${n2('f-mus','Masa muscular (kg)',L.muscle!=null?dec(L.muscle):'45,0')}</div>
+    <div class="pair" style="grid-template-columns:1fr 1fr">${n2('f-wat','% agua',L.water!=null?dec(L.water):'52,0')}${n2('f-vis','Grasa visceral',L.visceral!=null?dec(L.visceral):'4')}</div>
+    <div class="pair" style="grid-template-columns:1fr 1fr"><div class="field"><label for="f-goal">Objetivo de peso</label><input id="f-goal" type="text" inputmode="decimal" value="${db.weightGoal!=null?kg(db.weightGoal):''}" autocomplete="off"></div><div class="field"><label for="f-hgt">Tu altura (cm)</label><input id="f-hgt" type="text" inputmode="numeric" value="${db.height||''}" placeholder="165" autocomplete="off"></div></div>`}
   openSheet(`<h2>Añadir</h2>
     <div class="types">${Object.entries(TYPES).map(([k,v])=>`<button type="button" data-act="type" data-v="${k}" aria-pressed="${k===t}">${svg(k,1.8)}${v.n}</button>`).join('')}</div>
     <form data-form="add" style="display:flex;flex-direction:column;gap:12px">${body}<button class="btn full" type="submit">Guardar</button></form>`,'Añadir');
@@ -442,9 +469,10 @@ function submitAdd(){
   if(t==='frase'){const bk=db.books.find(x=>x.t.toLowerCase()===b.toLowerCase());const pg=val('f-c');db.quotes.unshift({id:uid(),q:a,b:bk?bk.t:b,bookId:bk?bk.id:null,p:pg?'pág. '+pg:''});ui.libSeg='frases';dest='libros';msg='Frase guardada'}
   if(t==='recurso'){let u=val('f-u'),title=a;if(!u&&looksUrl(a)){u=a;title=host(a)||a}db.resources.unshift({id:uid(),t:title,u,tag:b,date:key(today)});ui.libSeg='recursos';ui.resTag='Todos';dest='libros';msg='Recurso guardado'}
   if(t==='lista'){db.lists.push({id:uid(),t:a,items:[]});dest='notas';msg='Lista creada'}
-  if(t==='peso'){const v=parseFloat(a.replace(',','.'));if(!(v>0))return toast('Escribe un peso válido');const date=val('f-date')||key(today);
-    db.weights=db.weights.filter(w=>w.date!==date);db.weights.push({date,kg:v});db.weights.sort((x,y)=>x.date.localeCompare(y.date));
-    const g=parseFloat(val('f-goal').replace(',','.'));db.weightGoal=g>0?g:null;dest='deporte';msg='Peso apuntado'}
+  if(t==='peso'){const v=num(a);if(!(v>0))return toast('Escribe un peso válido');const date=val('f-date')||key(today);
+    const e={date,kg:v};for(const [k,id] of [['fat','f-fat'],['muscle','f-mus'],['water','f-wat'],['visceral','f-vis']]){const x=num(val(id));if(x>0)e[k]=x}
+    db.weights=db.weights.filter(w=>w.date!==date);db.weights.push(e);db.weights.sort((x,y)=>x.date.localeCompare(y.date));
+    const g=num(val('f-goal'));db.weightGoal=g>0?g:null;const h=num(val('f-hgt'));if(h>80&&h<250)db.height=h;dest='deporte';msg='Datos guardados'}
   closeSheet();save();if(dest)go(dest);toast(msg);
 }
 function planSheet(){
